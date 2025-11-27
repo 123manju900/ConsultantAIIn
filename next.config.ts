@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
       allowedOrigins: ['*'],
     },
   },
+  allowedDevOrigins: [
+    '127.0.0.1',
+    'localhost',
+    '*.replit.dev',
+  ],
 };
 
 export default nextConfig;
