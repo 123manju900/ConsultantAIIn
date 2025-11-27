@@ -2,7 +2,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import Exa from 'exa-js';
 
-const exa = new Exa(process.env.EXA_API_KEY);
+const exa = process.env.EXA_API_KEY ? new Exa(process.env.EXA_API_KEY) : null;
 
 export const webSearch = tool({
   description: 'Search the web for up-to-date information',
@@ -11,6 +11,10 @@ export const webSearch = tool({
   }),
   execute: async ({ query }) => {
     try {
+      if (!exa) {
+        console.error('EXA_API_KEY is not set');
+        return [];
+      }
       const { results } = await exa.search(query, {
         contents: {
           text: true,

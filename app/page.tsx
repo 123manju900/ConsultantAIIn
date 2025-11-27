@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
+import { nanoid } from 'nanoid';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -73,6 +74,19 @@ export default function Chat() {
   const stored = typeof window !== 'undefined' ? loadMessagesFromStorage() : { messages: [], durations: {} };
   const [initialMessages] = useState<UIMessage[]>(stored.messages);
 
+  const [chatId] = useState(() => nanoid());
+
+  useEffect(() => {
+    const cleanup = async () => {
+      // Use sendBeacon for reliable cleanup on page close
+      navigator.sendBeacon(`/api/chat/clear?chatId=${chatId}`);
+    };
+    window.addEventListener('beforeunload', cleanup);
+    return () => {
+      window.removeEventListener('beforeunload', cleanup);
+    };
+  }, [chatId]);
+
   const { messages, sendMessage, status, stop, setMessages } = useChat({
     messages: initialMessages,
   });
@@ -123,7 +137,7 @@ export default function Chat() {
   });
 
   function onSubmit(data: z.infer<typeof formSchema>) {
-    sendMessage({ text: data.message });
+    sendMessage({ text: data.message }, { body: { chatId } });
     form.reset();
   }
 

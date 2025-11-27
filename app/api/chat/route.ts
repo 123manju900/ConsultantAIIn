@@ -5,10 +5,21 @@ import { SYSTEM_PROMPT } from '@/prompts';
 import { isContentFlagged } from '@/lib/moderation';
 import { webSearch } from './tools/web-search';
 import { vectorDatabaseSearch } from './tools/search-vector-database';
+import { kv } from '@/lib/kv';
 
 export const maxDuration = 30;
 export async function POST(req: Request) {
-    const { messages }: { messages: UIMessage[] } = await req.json();
+    const { messages, chatId }: { messages: UIMessage[], chatId?: string } = await req.json();
+
+    if (chatId && kv) {
+        try {
+            const lastMessage = messages[messages.length - 1];
+            await kv.lpush(`chat:${chatId}`, JSON.stringify(lastMessage));
+            await kv.expire(`chat:${chatId}`, 300); // 5 min expiry
+        } catch (error) {
+            console.error('KV save failed:', error);
+        }
+    }
 
     const latestUserMessage = messages
         .filter(msg => msg.role === 'user')
@@ -73,6 +84,20 @@ export async function POST(req: Request) {
                 reasoningSummary: 'auto',
                 reasoningEffort: 'low',
                 parallelToolCalls: false,
+            }
+        },
+        onFinish: async ({ text, toolCalls }) => {
+            if (chatId && kv) {
+                try {
+                    await kv.lpush(`chat:${chatId}`, JSON.stringify({
+                        role: 'assistant',
+                        content: text,
+                        toolInvocations: toolCalls,
+                    }));
+                    await kv.expire(`chat:${chatId}`, 300); // Refresh expiry
+                } catch (error) {
+                    console.error('KV save failed:', error);
+                }
             }
         }
     });
